@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Kniffel Extreme</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+<style>
+:root{
+  --bg:#e8f0ff;--sf:#fff;--s2:#dce8ff;--bd:#b0c8f0;
+  --red:#1a4acc;--gold:#f5c842;--blue:#1a4acc;--green:#1a9e5a;
+  --accent:#0033bb;--text:#0a1a3a;--mu:#4a6090;--dim:#99b0d0;
+  --r:16px;--rs:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;font-family:'Nunito',sans-serif;}
+body{background:var(--bg);color:var(--text);display:flex;flex-direction:column;}
+.screen{display:none;flex-direction:column;height:100%;}
+.screen.active{display:flex;}
+
+/* ── LOBBY ── */
+#L{align-items:center;overflow-y:auto;padding:24px 16px 48px;gap:16px;
+   background:linear-gradient(160deg,#e0ecff 0%,#c8dcff 100%);}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:62px;letter-spacing:5px;color:var(--accent);line-height:1;text-align:center;text-shadow:2px 3px 0 rgba(0,0,120,.15);}
+.logo-s{font-size:11px;letter-spacing:5px;color:var(--mu);text-transform:uppercase;text-align:center;margin-top:2px;}
+.lcard{background:var(--sf);border:1.5px solid var(--bd);border-radius:var(--r);padding:18px;width:100%;max-width:390px;display:flex;flex-direction:column;gap:11px;box-shadow:0 2px 10px rgba(0,50,180,.08);}
+.lbl{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--mu);}
+.inp{background:var(--s2);border:1.5px solid var(--bd);border-radius:var(--rs);padding:13px 16px;color:var(--text);font-size:16px;font-family:'Nunito',sans-serif;font-weight:700;width:100%;outline:none;transition:border-color .2s;}
+.inp:focus{border-color:var(--accent);}
+.bet-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;}
+.bo{padding:10px 4px;border-radius:var(--rs);border:1.5px solid var(--bd);background:var(--s2);color:var(--mu);font-size:14px;font-weight:700;cursor:pointer;text-align:center;transition:all .15s;font-family:'Nunito',sans-serif;}
+.bo.sel{border-color:var(--gold);background:#fffbe0;color:#8a6000;}
+.divider{display:flex;align-items:center;gap:10px;color:var(--mu);font-size:12px;font-weight:700;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--bd);}
+.player-list{display:flex;flex-direction:column;gap:7px;}
+.player-item{display:flex;align-items:center;gap:10px;background:var(--s2);border-radius:10px;padding:10px 13px;font-size:13px;font-weight:700;border:1px solid var(--bd);}
+.pdot{width:9px;height:9px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.phost{font-size:10px;color:#8a6000;margin-left:auto;font-weight:800;}
+.dp span{animation:dp 1.2s infinite;}.dp span:nth-child(2){animation-delay:.2s;}.dp span:nth-child(3){animation-delay:.4s;}
+@keyframes dp{0%,80%,100%{opacity:.15}40%{opacity:1}}
+
+/* ── BUTTONS ── */
+.btn{padding:13px 20px;border-radius:var(--rs);font-size:14px;font-weight:700;font-family:'Nunito',sans-serif;border:none;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+.btn:active{transform:scale(.95);}
+.btn:disabled{opacity:.35;transform:none;cursor:default;}
+.btn-p{background:linear-gradient(135deg,#1a4acc,#2255ee);color:#fff;width:100%;font-size:15px;padding:15px;box-shadow:0 4px 16px rgba(26,74,204,.3);}
+.btn-b{background:var(--s2);border:1.5px solid var(--accent);color:var(--accent);width:100%;}
+.btn-g{background:linear-gradient(135deg,#e8a800,#f5c800);color:#5a3a00;width:100%;font-size:15px;padding:15px;font-weight:800;box-shadow:0 3px 12px rgba(232,168,0,.3);}
+.btn-gh{background:var(--s2);border:1.5px solid var(--bd);color:var(--mu);}
+.btn-sm{padding:8px 14px;font-size:12px;border-radius:10px;}
+
+/* ── GAME ── */
+#G{flex-direction:column;}
+.ghdr{display:flex;justify-content:space-between;align-items:center;padding:10px 14px 8px;border-bottom:2px solid #1033aa;background:linear-gradient(135deg,#1a4acc,#0033bb);flex-shrink:0;}
+.glogo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:#fff;text-shadow:1px 2px 0 rgba(0,0,0,.2);}
+.hr{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end;}
+.chip{width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 0 4px rgba(255,255,255,.6);}
+.chip.u{background:rgba(255,255,255,.25);box-shadow:none;}
+.sp{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;}
+.sp-y{background:rgba(255,255,255,.95);color:var(--accent);}
+.sp-o{background:rgba(255,240,150,.95);color:#5a3a00;}
+.sp-b{background:rgba(255,255,255,.2);color:#fff;font-size:10px;}
+.scroll{flex:1;overflow-y:auto;padding:12px 12px 110px;display:flex;flex-direction:column;gap:12px;}
+.card{background:var(--sf);border:1.5px solid var(--bd);border-radius:var(--r);padding:16px;box-shadow:0 2px 8px rgba(0,50,180,.07);}
+.tbadge{display:inline-block;font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px;margin-bottom:10px;letter-spacing:.5px;}
+.tb-y{background:#e0e8ff;color:var(--accent);border:1px solid #b0c0f0;}
+.tb-o{background:#e0fff0;color:var(--green);border:1px solid #a0d8b0;}
+.tb-b{background:var(--s2);color:var(--mu);border:1px solid var(--bd);}
+.stxt{font-size:13px;color:var(--mu);min-height:18px;margin-bottom:10px;line-height:1.5;font-weight:600;}
+
+/* ══ DICE — big emoji faces, animated ══ */
+.dice-scene{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;}
+.die-wrap{
+  width:70px;height:70px;border-radius:14px;
+  border:2.5px solid var(--bd);
+  background:linear-gradient(145deg,#fff 0%,#e8f0ff 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;user-select:none;position:relative;
+  transition:all .2s;
+  box-shadow:0 3px 10px rgba(0,50,180,.12),inset 0 1px 0 rgba(255,255,255,.8);
+}
+.die-wrap .face{font-size:36px;line-height:1;transition:transform .06s;}
+.die-wrap .dlbl{font-size:8px;font-weight:800;letter-spacing:1.5px;color:#cc2200;margin-top:1px;text-transform:uppercase;}
+.die-wrap:active{transform:scale(.90);}
+.die-wrap.kept{
+  border-color:var(--accent);
+  background:linear-gradient(145deg,#d8e8ff,#c0d4ff);
+  box-shadow:0 0 16px rgba(26,74,204,.35),0 3px 10px rgba(0,50,180,.12);
+}
+.die-wrap.kept::after{content:'✓';position:absolute;top:3px;right:6px;font-size:11px;font-weight:800;color:var(--accent);}
+.die-wrap.rdie{
+  border-color:#cc3300;
+  background:linear-gradient(145deg,#fff5f0,#ffe0d8);
+}
+.die-wrap.rdie .face{color:#cc2200;}
+.die-wrap.rdie.kept{border-color:#cc3300;background:linear-gradient(145deg,#ffccc0,#ffb8a8);box-shadow:0 0 16px rgba(204,51,0,.35);}
+
+/* Roll animation — shake and bounce */
+@keyframes dieShake{
+  0%  {transform:scale(1.25) rotate(-18deg);}
+  15% {transform:scale(.82) rotate(14deg);}
+  30% {transform:scale(1.15) rotate(-10deg);}
+  50% {transform:scale(.9) rotate(7deg);}
+  70% {transform:scale(1.08) rotate(-4deg);}
+  85% {transform:scale(.97) rotate(2deg);}
+  100%{transform:scale(1) rotate(0deg);}
+}
+@keyframes faceSpin{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(.3);opacity:.3;}
+}
+.die-wrap.rolling{animation:dieShake .5s cubic-bezier(.36,.07,.19,.97);}
+.die-wrap.rolling .face{animation:faceSpin .07s linear infinite;}
+
+/* Opponent dice preview */
+.opp-dice{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0;}
+.opp-die{width:42px;height:42px;border-radius:9px;background:var(--s2);border:1.5px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.opp-die.opp-rd{border-color:#cc3300;background:#fff0ee;color:#cc2200;}
+
+/* ── Sum bar ── */
+.sbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.snum{font-family:'Bebas Neue',sans-serif;font-size:28px;background:var(--s2);padding:2px 16px;border-radius:20px;border:1.5px solid var(--bd);color:var(--text);letter-spacing:1px;}
+.ht{font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;}
+.ht-g{background:#e0fff0;color:var(--green);border:1px solid #a0d8b0;}
+.ht-b{background:#e0e8ff;color:var(--accent);border:1px solid #b0c0f0;}
+
+/* ── Quick btns ── */
+.qrow{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;}
+.qbtn{padding:8px 14px;border-radius:10px;font-size:12px;font-weight:700;border:1.5px solid var(--accent);background:#e0e8ff;color:var(--accent);cursor:pointer;font-family:'Nunito',sans-serif;transition:all .15s;}
+.qbtn:active{transform:scale(.93);}
+.qbtn.knf{border-color:#cc3300;background:#fff0ee;color:#cc3300;}
+
+/* ── Action row ── */
+.arow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.btn-roll{background:linear-gradient(135deg,#1a4acc,#2255ee);color:#fff;font-size:16px;font-weight:800;padding:14px 22px;box-shadow:0 4px 16px rgba(26,74,204,.35);border-radius:var(--rs);}
+.btn-roll:disabled{background:var(--s2);box-shadow:none;color:var(--mu);}
+.btn-chip{background:#fff0ee;border:1.5px solid #cc3300;color:#cc3300;padding:11px 16px;border-radius:var(--rs);}
+.btn-wert{background:var(--s2);border:1.5px solid var(--bd);color:var(--text);padding:11px 16px;border-radius:var(--rs);}
+.btn-stk{background:var(--s2);border:1.5px solid var(--bd);color:var(--mu);padding:11px 16px;border-radius:var(--rs);}
+.btn-stk.on{background:#fff0ee;border-color:#cc3300;color:#cc3300;}
+.btn-new{background:var(--s2);border:1.5px solid var(--bd);color:var(--mu);font-size:12px;padding:9px 13px;border-radius:var(--rs);}
+.ban{border-radius:var(--rs);padding:10px 14px;font-size:12px;font-weight:600;margin:8px 0;line-height:1.5;}
+.ban-s{background:#fff0ee;border:1px solid #f0b8a8;color:#993010;}
+.ban-cf{background:#fff0ee;border:1px solid #f0b8a8;color:#993010;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;}
+
+/* ── Score table (same as before) ── */
+.shdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.shdr-t{font-size:14px;font-weight:800;}
+.shdr-n{font-size:10px;color:var(--mu);font-weight:700;}
+.slbl{font-size:9px;font-weight:800;letter-spacing:2.5px;color:var(--mu);text-transform:uppercase;padding:7px 4px 4px;border-bottom:1px solid var(--bd);}
+.sr{display:flex;align-items:center;padding:7px 4px;border-bottom:1px solid rgba(150,180,230,.3);border-radius:8px;cursor:default;transition:background .12s;}
+.sr.can{cursor:pointer;}.sr.can:active{background:#e0e8ff;}
+.sr.stk{cursor:pointer;}.sr.stk:active{background:#fff0ee;}
+.cn{flex:1;font-size:12px;font-weight:600;}.cfx{font-size:9px;color:var(--mu);margin-left:3px;}
+.cv{min-width:44px;text-align:right;font-size:12px;font-weight:700;}
+.cv.prev{color:var(--accent);font-style:italic;}.cv.scrd{color:var(--text);}.cv.zero{color:var(--dim);}.cv.spv{color:#cc3300;font-style:italic;}.cv.emp{color:var(--dim);}
+.kb{display:inline-block;font-size:9px;font-weight:800;background:var(--gold);color:#5a3a00;padding:1px 5px;border-radius:6px;margin-left:3px;}
+.bonrow{padding:5px 4px;font-size:11px;color:var(--mu);font-weight:600;display:flex;align-items:center;border-bottom:1px solid var(--bd);}
+.totrow{padding:9px 4px;display:flex;align-items:center;font-weight:800;font-size:15px;}
+.gow{text-align:center;padding:32px 16px;}
+.got{font-family:'Bebas Neue',sans-serif;font-size:48px;letter-spacing:4px;color:var(--accent);margin-bottom:6px;}
+.gos{display:flex;justify-content:center;gap:40px;flex-wrap:wrap;margin-bottom:28px;}
+.gob .gn{font-size:11px;color:var(--mu);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.gob .gp{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:2px;}
+.gob.win .gp{color:var(--accent);}
+.betres{font-size:15px;font-weight:800;color:var(--green);margin-bottom:20px;}
+.think{text-align:center;padding:20px;color:var(--mu);font-size:14px;font-weight:600;}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(90px);background:#0033bb;border-radius:14px;padding:11px 20px;font-size:13px;font-weight:700;color:#fff;z-index:200;transition:transform .3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;box-shadow:0 6px 24px rgba(0,50,180,.3);}
+.toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div class="screen active" id="L">
+  <div class="logo">Kniffel<br>Extreme</div>
+  <div class="logo-s">Multiplayer Edition</div>
+  <div class="lcard">
+    <div class="lbl">Dein Name</div>
+    <input class="inp" id="nameIn" maxlength="14" placeholder="Spielername">
+  </div>
+  <div class="lcard">
+    <div class="lbl">Einsatz 💰</div>
+    <div class="bet-g">
+      <div class="bo sel" data-v="0"  onclick="setBet(0)">Kein</div>
+      <div class="bo"    data-v="5"   onclick="setBet(5)">5 €</div>
+      <div class="bo"    data-v="10"  onclick="setBet(10)">10 €</div>
+      <div class="bo"    data-v="20"  onclick="setBet(20)">20 €</div>
+      <div class="bo"    data-v="50"  onclick="setBet(50)">50 €</div>
+      <div class="bo"    data-v="100" onclick="setBet(100)">100 €</div>
+    </div>
+    <input class="inp" id="betCustom" type="number" min="0" placeholder="Eigener Betrag (€)" style="margin-top:4px;" oninput="setBet(parseInt(this.value)||0,true)">
+  </div>
+  <div class="lcard">
+    <div class="lbl">Spielmodus</div>
+    <button class="btn btn-p" onclick="vsBot()">🤖 Gegen Bot spielen</button>
+    <div class="divider">oder Multiplayer (bis 5 Spieler)</div>
+    <input class="inp" id="roomIn" placeholder="4-stelliger Code" maxlength="4"
+      style="text-transform:uppercase;letter-spacing:5px;font-weight:800;font-size:26px;text-align:center;"
+      oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-p" style="flex:1" onclick="createRoom()">🏠 Erstellen</button>
+      <button class="btn btn-b" style="flex:1;width:auto;" onclick="joinRoom()">🚪 Beitreten</button>
+    </div>
+  </div>
+  <div class="lcard" id="waitCard" style="display:none;">
+    <div class="lbl">Raum <span id="waitCode" style="color:#8a6000;letter-spacing:4px;font-size:16px;"></span></div>
+    <div class="player-list" id="playerList"></div>
+    <div style="font-size:11px;color:var(--mu);font-weight:600;line-height:1.6;">Teile den Code — gleicher Link, gleicher Code, dann Beitreten.</div>
+    <button class="btn btn-g" id="startBtn" onclick="hostStart()" style="display:none;">🎲 Spiel starten!</button>
+    <div id="guestWait" style="font-size:13px;color:var(--mu);font-weight:600;text-align:center;display:none;">Warte auf Host <span class="dp"><span>.</span><span>.</span><span>.</span></span></div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen" id="G">
+  <div class="ghdr">
+    <div class="glogo">KNIFFEL EXTREME</div>
+    <div class="hr">
+      <div id="chipRow" style="display:flex;gap:4px;"></div>
+      <div id="betBadge"></div>
+      <div id="scorePills" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+    </div>
+  </div>
+  <div class="scroll" id="SA"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ABLY_KEY='M2eomA.5AAhxQ:964xp-NgIAkMlTCX5gxoIoFVR8HAB5qfZQY30Ev_qck';
+// Big emoji faces for dice — no SVG icons
+const FACES=["","⚀","⚁","⚂","⚃","⚄","⚅"];
+
+const CATS=[
+  {id:"u1",label:"Einser",upper:true,num:1},{id:"u2",label:"Zweier",upper:true,num:2},
+  {id:"u3",label:"Dreier",upper:true,num:3},{id:"u4",label:"Vierer",upper:true,num:4},
+  {id:"u5",label:"Fünfer",upper:true,num:5},{id:"u6",label:"Sechser",upper:true,num:6},
+  {id:"l3p",label:"Dreierpasch",upper:false},{id:"l2pa",label:"Zwei Paare",upper:false},
+  {id:"l4p",label:"Viererpasch",upper:false},{id:"l3pa",label:"Drei Paare",upper:false,fixed:35},
+  {id:"lfh",label:"Full House",upper:false,fixed:25},{id:"l2dr",label:"Zwei Dreier",upper:false,fixed:45},
+  {id:"lks",label:"Kl. Straße",upper:false,fixed:30},{id:"lgfh",label:"Gr. Full House",upper:false,fixed:45},
+  {id:"lgs",label:"Gr. Straße",upper:false,fixed:40},{id:"lknf",label:"Kniffel",upper:false,fixed:50},
+  {id:"l10",label:"10 od. weniger",upper:false,fixed:40},{id:"lhw",label:"Highway",upper:false,fixed:50},
+  {id:"l33",label:"33 od. mehr",upper:false,fixed:40},{id:"lke",label:"Kniffel Extreme★",upper:false,fixed:75},
+  {id:"lch",label:"Chance",upper:false},{id:"lsc",label:"Super Chance×2",upper:false},
+];
+const PRIO={lke:100,lknf:90,lhw:85,lgs:75,lgfh:70,l2dr:65,lks:60,lfh:55,l3pa:50,l4p:45,l33:40,l10:38,l3p:30,l2pa:25,u6:35,u5:32,u4:28,u3:24,u2:18,u1:14,lsc:10,lch:8};
+const r6=()=>Math.ceil(Math.random()*6);
+const r10=()=>Math.floor(Math.random()*10);
+const allD=d=>[...d.w,d.r];
+const dsum=d=>allD(d).reduce((a,b)=>a+b,0);
+
+function calcSc(id,d){
+  const a=allD(d),s=a.reduce((x,y)=>x+y,0);
+  const cnt={};a.forEach(v=>{cnt[v]=(cnt[v]||0)+1});
+  const vs=Object.values(cnt).sort((a,b)=>b-a);
+  const u=[...new Set(a)].sort((a,b)=>a-b);
+  const run=()=>{let c=1,b=1;for(let i=1;i<u.length;i++){if(u[i]===u[i-1]+1){c++;b=Math.max(b,c);}else if(u[i]!==u[i-1])c=1;}return b;};
+  switch(id){
+    case"u1":return a.filter(v=>v===1).length;case"u2":return a.filter(v=>v===2).length*2;
+    case"u3":return a.filter(v=>v===3).length*3;case"u4":return a.filter(v=>v===4).length*4;
+    case"u5":return a.filter(v=>v===5).length*5;case"u6":return a.filter(v=>v===6).length*6;
+    case"l3p":return vs[0]>=3?s:0;case"l2pa":return vs.filter(v=>v>=2).length>=2?s:0;
+    case"l4p":return vs[0]>=4?s:0;case"l3pa":return vs.filter(v=>v>=2).length>=3?35:0;
+    case"lfh":return(vs[0]>=3&&vs.length>=2&&vs[1]>=2)?25:0;
+    case"l2dr":return vs.filter(v=>v>=3).length>=2?45:0;case"lks":return run()>=4?30:0;
+    case"lgfh":return(vs[0]>=4&&vs.length>=2&&vs[1]>=2)?45:0;case"lgs":return run()>=5?40:0;
+    case"lknf":return vs[0]>=5?50:0;case"l10":return s<=10?40:0;case"lhw":return run()>=6?50:0;
+    case"l33":return s>=33?40:0;case"lke":return vs[0]>=6?75:0;case"lch":return s;case"lsc":return s*2;
+    default:return 0;
+  }
+}
+const isKnf=d=>{const c={};allD(d).forEach(v=>{c[v]=(c[v]||0)+1});return Object.values(c).sort((a,b)=>b-a)[0]>=5};
+const isKE=d=>{const c={};allD(d).forEach(v=>{c[v]=(c[v]||0)+1});return Object.values(c).sort((a,b)=>b-a)[0]>=6};
+const upSum=s=>["u1","u2","u3","u4","u5","u6"].reduce((t,id)=>t+(s[id]??0),0);
+const totPts=s=>{const u=upSum(s);return u+(u>=73?45:0)+CATS.filter(c=>!c.upper).reduce((t,c)=>t+(s[c.id]??0),0);};
+
+// Bot AI
+function ktFor(id,d){
+  const a=allD(d);const cnt={};a.forEach(v=>{cnt[v]=(cnt[v]||0)+1});
+  const by=Object.entries(cnt).sort((a,b)=>b[1]-a[1]||b[0]-a[0]);const top=parseInt(by[0][0]);
+  switch(id){
+    case"u1":case"u2":case"u3":case"u4":case"u5":case"u6":{const n=CATS.find(c=>c.id===id).num;return{w:d.w.map(v=>v===n),r:d.r===n};}
+    case"lke":case"lknf":return{w:d.w.map(v=>v===top),r:d.r===top};
+    case"lhw":case"lgs":case"lks":{const u=[...new Set(a)].sort((a,b)=>a-b);let best=[],cur=[u[0]];for(let i=1;i<u.length;i++){if(u[i]===u[i-1]+1)cur.push(u[i]);else{if(cur.length>best.length)best=cur;cur=[u[i]];}}if(cur.length>best.length)best=cur;const ss=new Set(best);const used=new Set();return{w:d.w.map(v=>{if(ss.has(v)&&!used.has(v)){used.add(v);return true;}return false;}),r:(ss.has(d.r)&&!used.has(d.r))?(()=>{used.add(d.r);return true;})():false};}
+    case"lgfh":case"lfh":{const tri=by.find(([,c])=>c>=3);if(tri){const tv=parseInt(tri[0]);const pair=by.find(([v,c])=>parseInt(v)!==tv&&c>=2);if(pair){const pv=parseInt(pair[0]);return{w:d.w.map(v=>v===tv||v===pv),r:d.r===tv||d.r===pv};}return{w:d.w.map(v=>v===tv),r:d.r===tv};}const p=by.filter(([,c])=>c>=2).map(([v])=>parseInt(v)).slice(0,2);const ps=new Set(p);return{w:d.w.map(v=>ps.has(v)),r:ps.has(d.r)};}
+    case"l2dr":{const t=by.filter(([,c])=>c>=2).map(([v])=>parseInt(v)).slice(0,2);const ts=new Set(t);return{w:d.w.map(v=>ts.has(v)),r:ts.has(d.r)};}
+    case"l3pa":{const p=by.filter(([,c])=>c>=2).map(([v])=>parseInt(v)).slice(0,3);const ps=new Set(p);return{w:d.w.map(v=>ps.has(v)),r:ps.has(d.r)};}
+    default:{if(by[0][1]>=3)return{w:d.w.map(v=>v===top),r:d.r===top};const p=by.filter(([,c])=>c>=2).map(([v])=>parseInt(v)).slice(0,2);if(p.length>=2){const ps=new Set(p);return{w:d.w.map(v=>ps.has(v)),r:ps.has(d.r)};}return{w:d.w.map(v=>v===top),r:d.r===top};}
+  }
+}
+function sampleEV(catId,d,keep,rerolls,N=60){
+  if(rerolls===0)return calcSc(catId,d);let t=0;
+  for(let i=0;i<N;i++){const d2={w:d.w.map((v,j)=>keep.w[j]?v:r6()),r:keep.r?d.r:r10()};if(rerolls>=2){const k2=ktFor(catId,d2);const d3={w:d2.w.map((v,j)=>k2.w[j]?v:r6()),r:k2.r?d2.r:r10()};t+=calcSc(catId,d3);}else t+=calcSc(catId,d2);}return t/N;
+}
+function botPick(d,scores,rerolls){
+  const free=CATS.filter(c=>scores[c.id]===undefined);if(!free.length)return null;
+  const up=upSum(scores);const upF=CATS.filter(c=>c.upper&&scores[c.id]===undefined).length;const urg=up<73&&upF<=3;
+  let bc=null,bk=null,bv=-Infinity;
+  for(const cat of free){
+    const keep=ktFor(cat.id,d);const e=sampleEV(cat.id,d,keep,rerolls,60);const pri=PRIO[cat.id]??20;
+    let val=e<=0?-pri*2:e*(pri/30);
+    if(cat.upper&&urg&&calcSc(cat.id,d)>=Math.ceil((73-up)/Math.max(upF,1))*0.7)val+=15;
+    if(cat.id==="lke")val=e>5?e*3:e*0.1;if(cat.id==="lknf")val=e>5?e*2.2:e*0.15;
+    if(cat.id==="lhw")val=e>5?e*2:e*0.1;if(cat.id==="l2dr")val=e>5?e*1.6:e*0.3;
+    if(cat.id==="lgfh")val=e>5?e*1.3:e*0.4;if(cat.id==="lsc")val=e*1.15;
+    if(val>bv){bv=val;bc=cat.id;bk=keep;}
+  }return{cat:bc,keep:bk};
+}
+function botScratch(scores){return CATS.filter(c=>scores[c.id]===undefined).sort((a,b)=>(PRIO[a.id]??20)-(PRIO[b.id]??20))[0]?.id;}
+
+// Ably
+let ably=null,channel=null;
+let myId=Math.random().toString(36).substr(2,8);
+let myBet=0,myName='Spieler',gameMode='bot';
+let roomCode='',isHost=false,lobbyPlayers=[];
+
+function initAbly(room,onReady){
+  ably=new Ably.Realtime({key:ABLY_KEY,clientId:myId});
+  ably.connection.on('connected',()=>{
+    channel=ably.channels.get('kniffel-'+room);
+    channel.subscribe(msg=>handleAbly(msg));
+    if(onReady)onReady();
+  });
+  ably.connection.on('failed',()=>showToast('Verbindung fehlgeschlagen'));
+}
+function ablyPub(type,data){if(channel)channel.publish(type,{...data,from:myId});}
+function handleAbly(msg){
+  const d=msg.data;if(d.from===myId)return;
+  if(msg.name==='join'&&isHost){
+    if(lobbyPlayers.find(p=>p.id===d.id))return;
+    lobbyPlayers.push({id:d.id,name:d.name,bet:d.bet,host:false});
+    renderLobby();showToast('🎉 '+d.name+' beigetreten!');
+    ablyPub('lobby',{players:lobbyPlayers});
+  } else if(msg.name==='lobby'&&!isHost){
+    lobbyPlayers=d.players;renderLobby();
+  } else if(msg.name==='start'){
+    const myIdx=d.players.findIndex(p=>p.id===myId);if(myIdx<0)return;
+    startGame(d.players,d.bet,myIdx);
+  } else if(msg.name==='move'){
+    applyRemoteMove(d);
+  } else if(msg.name==='rolling'){
+    G.oppRolling={dice:d.dice,kept:d.kept};render();
+  } else if(msg.name==='rolled'){
+    G.oppRolling=null;render();
+  }
+}
+
+function setBet(v,custom=false){myBet=v;document.querySelectorAll('.bo').forEach(el=>el.classList.toggle('sel',!custom&&parseInt(el.dataset.v)===v));if(!custom)document.getElementById('betCustom').value='';}
+function getName(){return document.getElementById('nameIn').value.trim()||'Spieler';}
+function getRoom(){const v=document.getElementById('roomIn').value.trim().toUpperCase();if(v.length!==4){showToast('Bitte genau 4 Zeichen');return null;}return v;}
+function createRoom(){myName=getName();isHost=true;gameMode='multi';roomCode=getRoom();if(!roomCode)return;lobbyPlayers=[{id:myId,name:myName,bet:myBet,host:true}];showToast('Verbinde…');initAbly(roomCode,()=>{showToast('Raum '+roomCode+' erstellt!');showWaitCard(true);});}
+function joinRoom(){myName=getName();isHost=false;gameMode='multi';roomCode=getRoom();if(!roomCode)return;showToast('Verbinde…');initAbly(roomCode,()=>{ablyPub('join',{id:myId,name:myName,bet:myBet});lobbyPlayers=[{id:myId,name:myName,bet:myBet,host:false}];showToast('Verbunden!');showWaitCard(false);});}
+function showWaitCard(iAmHost){document.getElementById('waitCard').style.cssText='display:flex;flex-direction:column;';document.getElementById('waitCode').textContent=roomCode;document.getElementById('startBtn').style.display=iAmHost?'flex':'none';document.getElementById('guestWait').style.display=iAmHost?'none':'block';renderLobby();}
+function renderLobby(){
+  document.getElementById('playerList').innerHTML=lobbyPlayers.map(p=>`<div class="player-item"><span class="pdot"></span><span>${p.name}</span>${p.bet>0?`<span style="font-size:11px;color:#8a6000;">💰${p.bet}€</span>`:''}${p.host?`<span class="phost">HOST</span>`:''}</div>`).join('');
+  if(isHost)document.getElementById('startBtn').style.display=lobbyPlayers.length>=2?'flex':'none';
+}
+function hostStart(){
+  if(lobbyPlayers.length<2){showToast('Mindestens 2 Spieler');return;}
+  const bet=Math.max(...lobbyPlayers.map(p=>p.bet||0));
+  const players=lobbyPlayers.map(p=>({id:p.id,name:p.name,isBot:false}));
+  ablyPub('start',{players,bet});
+  startGame(players,bet,players.findIndex(p=>p.id===myId));
+}
+
+// Game
+let G={};
+const nd=()=>({w:[r6(),r6(),r6(),r6(),r6()],r:r10()});
+const nk=()=>({w:[false,false,false,false,false],r:false});
+function vsBot(){myName=getName();myId=Math.random().toString(36).substr(2,8);gameMode='bot';startGame([{id:myId,name:myName,isBot:false},{id:'bot',name:'Bot 🤖',isBot:true}],myBet,0);}
+function startGame(players,bet,myIdx){
+  gameMode=players.some(p=>p.isBot)?'bot':'multi';
+  G={players,myIdx,bet:bet||0,phase:'idle',rolls:3,dice:nd(),kept:nk(),chips:3,scores:players.map(()=>({})),counts:players.map(()=>({lknf:0,lke:0})),curP:0,strikeMode:false,confirmRestart:false,msg:'Tippe auf Würfeln!',rolling:false,oppRolling:null};
+  switchScreen('G');render();
+  if(G.players[0].isBot)setTimeout(botTurn,800);
+}
+const me=()=>G.players[G.myIdx];
+const myTurn=()=>G.curP===G.myIdx;
+
+function render(){
+  updateHdr();const area=document.getElementById('SA');
+  if(G.phase==='gameover'){renderGO(area);return;}
+  if(!myTurn()&&!G.players[G.curP]?.isBot){renderWait(area);return;}
+  if(G.players[G.curP]?.isBot&&G.phase==='bot'){renderBot(area);return;}
+  renderMain(area);
+}
+function updateHdr(){
+  document.getElementById('chipRow').innerHTML=[0,1,2].map(i=>`<div class="chip${i>=G.chips?' u':''}"></div>`).join('');
+  document.getElementById('betBadge').innerHTML=G.bet>0?`<span class="sp sp-b">💰${G.bet}€</span>`:'';
+  document.getElementById('scorePills').innerHTML=G.players.map((p,i)=>`<span class="sp ${i===G.myIdx?'sp-y':'sp-o'}">${p.name.split(' ')[0]}: ${totPts(G.scores[i]||{})}</span>`).join('');
+}
+function renderGO(area){
+  if(ably)ably.close();
+  const scores=G.players.map((p,i)=>({name:p.name,pts:totPts(G.scores[i]||{}),idx:i})).sort((a,b)=>b.pts-a.pts);
+  const winner=scores[0];const iWin=winner.idx===G.myIdx;
+  area.innerHTML=`<div class="card gow"><div class="got">${iWin?'Du gewinnst! 🎉':winner.name+' gewinnt!'}</div>${G.bet>0?`<div class="betres">${iWin?'+'+G.bet+'€ gewonnen!':'-'+G.bet+'€'}</div>`:''}<div class="gos">${scores.map((s,i)=>`<div class="gob${i===0?' win':''}"><div class="gn">${s.name}</div><div class="gp">${s.pts}</div></div>`).join('')}</div><button class="btn btn-p" onclick="goLobby()">Zurück zur Lobby</button></div>${scTable()}`;
+}
+function renderWait(area){
+  const cur=G.players[G.curP];
+  let oppDice='';
+  if(G.oppRolling){
+    const od=G.oppRolling.dice,ok=G.oppRolling.kept;
+    oppDice=`<div style="margin:8px 0 4px;font-size:11px;color:var(--mu);font-weight:700;">Würfelt gerade:</div>
+    <div class="opp-dice">
+      ${od.w.map((v,i)=>`<div class="opp-die">${v>=1&&v<=6?FACES[v]:v}</div>`).join('')}
+      <div class="opp-die opp-rd">${od.r}</div>
+    </div>`;
+  }
+  area.innerHTML=`<div class="card"><div class="tbadge tb-o">${cur?.name||'Gegner'} ist dran</div>${oppDice}<div class="think">Warte <span class="dp"><span>.</span><span>.</span><span>.</span></span></div></div>${scTable()}`;
+}
+function renderBot(area){area.innerHTML=`<div class="card"><div class="tbadge tb-b">Bot denkt</div><div class="think"><span class="dp"><span>.</span><span>.</span><span>.</span></span></div></div>${scTable()}`;}
+
+function renderMain(area){
+  const hasR=G.phase==='rolling'||G.phase==='score',strike=G.strikeMode&&G.phase==='score',msc=G.scores[G.myIdx];
+
+  // Dice — simple big face, no 3D cube inside cube
+  let diceHTML=`<div class="dice-scene">`;
+  G.dice.w.forEach((v,i)=>{
+    const face=v>=1&&v<=6?FACES[v]:String(v);
+    diceHTML+=`<div class="die-wrap${G.kept.w[i]?' kept':''}${G.rolling&&!G.kept.w[i]?' rolling':''}" id="dw${i}" onclick="tw(${i})">
+      <span class="face">${face}</span>
+    </div>`;
+  });
+  diceHTML+=`<div class="die-wrap rdie${G.kept.r?' kept':''}${G.rolling&&!G.kept.r?' rolling':''}" id="dr" onclick="tr_()">
+    <span class="face">${G.dice.r}</span>
+    <span class="dlbl">W10</span>
+  </div></div>`;
+
+  const s=dsum(G.dice),ks=G.dice.w.reduce((t,v,i)=>t+(G.kept.w[i]?v:0),0)+(G.kept.r?G.dice.r:0),kc=G.kept.w.filter(Boolean).length+(G.kept.r?1:0);
+  let hints='';
+  if(hasR){if(s<=10)hints+=`<span class="ht ht-g">✓ 10 od. weniger</span>`;if(s>=33)hints+=`<span class="ht ht-g">✓ 33 od. mehr</span>`;if(isKE(G.dice))hints+=`<span class="ht ht-g">✓ Kniffel Extreme!</span>`;else if(isKnf(G.dice))hints+=`<span class="ht ht-g">✓ Kniffel!</span>`;if(calcSc('lhw',G.dice)>0)hints+=`<span class="ht ht-g">✓ Highway</span>`;else if(calcSc('lgs',G.dice)>0)hints+=`<span class="ht ht-b">✓ Gr. Straße</span>`;}
+
+  let qb='';
+  if(G.phase==='score'&&!strike){const opts=[];for(const cat of CATS){const v=calcSc(cat.id,G.dice);if(v<=0)continue;const isk=cat.id==='lknf'||cat.id==='lke';if(msc[cat.id]===undefined)opts.push({cat,v,extra:false});else if(isk){const nc=(G.counts[G.myIdx][cat.id]||1)+1;opts.push({cat,v:cat.fixed*nc,extra:true,nc});}}if(opts.length)qb=`<div class="qrow">${opts.map(({cat,v,extra,nc})=>`<button class="qbtn${extra?' knf':''}" onclick="${extra?`actKnf('${cat.id}')`:`act('${cat.id}',false)`}">${cat.label}: ${v}${extra?` (${nc}×)`:''}</button>`).join('')}</div>`;}
+
+  const rollBtn=G.rolls>0&&!strike?`<button class="btn btn-roll" onclick="doRoll()">🎲 Würfeln (${G.rolls})</button>`:`<button class="btn btn-roll" disabled>🎲 Würfeln</button>`;
+  const wBtn=G.phase==='rolling'&&!strike?`<button class="btn btn-wert" onclick="forceScore()">Werten</button>`:'';
+  const cBtn=G.chips>0&&G.phase==='score'&&!strike?`<button class="btn btn-chip" onclick="useChip()">🔴 Chip (${G.chips})</button>`:'';
+  const sBtn=G.phase==='score'?`<button class="btn btn-stk${strike?' on':''}" onclick="toggleStrike()">${strike?'✕ Abbrechen':'✕ Streichen'}</button>`:'';
+  const nBtn=`<button class="btn btn-new" onclick="askRestart()">↺</button>`;
+
+  area.innerHTML=`<div class="card"><div class="tbadge tb-y">Dein Zug</div><div class="stxt">${G.msg}</div>${diceHTML}<div class="sbar"><span style="font-size:12px;color:var(--mu);font-weight:700;">Summe</span><span class="snum">${s}</span>${kc>0&&G.phase==='rolling'?`<span style="font-size:12px;color:var(--mu);font-weight:700;">Gehalten</span><span class="snum">${ks}</span>`:''}${hints}</div>${qb}${strike?`<div class="ban ban-s">✕ Streichmodus — Feld antippen = 0</div>`:''}<div class="arow">${rollBtn}${wBtn}${cBtn}${sBtn}${nBtn}</div>${G.confirmRestart?`<div class="ban ban-cf">Zurück?<button class="btn btn-gh btn-sm" onclick="goLobby()">Ja</button><button class="btn btn-gh btn-sm" onclick="cancelRestart()">Nein</button></div>`:''}</div>${scTable()}`;
+}
+
+function scTable(){
+  const hasR=(G.phase==='rolling'||G.phase==='score')&&myTurn(),strike=G.strikeMode&&G.phase==='score';
+  const msc=G.scores[G.myIdx]||{};const osc=G.scores.find((_,i)=>i!==G.myIdx)||{};
+  const pre={};if(hasR)CATS.forEach(c=>{if(msc[c.id]===undefined)pre[c.id]=calcSc(c.id,G.dice);});
+
+  function row(cat){
+    const pd=msc[cat.id]!==undefined,bd=osc[cat.id]!==undefined,pv=pre[cat.id];
+    const isk=cat.id==='lknf'||cat.id==='lke',pc_=G.counts[G.myIdx][cat.id]||0,bc_=G.counts.find((_,i)=>i!==G.myIdx)?.[cat.id]||0;
+    const xK=isk&&pd&&hasR&&calcSc(cat.id,G.dice)>0&&!strike&&myTurn();
+    const canSc=myTurn()&&G.phase==='score'&&!pd&&pv>0&&!strike,strk=strike&&!pd&&myTurn();
+    let cls='sr',oc='';
+    if(strk){cls+=' stk';oc=`onclick="act('${cat.id}',true)"`;}else if(xK||canSc){cls+=' can';oc=`onclick="${xK?`actKnf('${cat.id}')`:`act('${cat.id}',false)`}"`;}
+    let pCell;
+    if(xK){const nc=pc_+1,tot=cat.fixed*nc;pCell=`<span class="cv scrd">${tot}<span class="kb">${nc}×</span></span>`;}
+    else if(pd){const b=pc_>1?`<span class="kb">${pc_}×</span>`:'';pCell=`<span class="cv scrd${msc[cat.id]===0?' zero':''}">${msc[cat.id]===0?'✕':msc[cat.id]}${b}</span>`;}
+    else if(strk){pCell=`<span class="cv spv">→ 0</span>`;}
+    else if(myTurn()&&G.phase==='score'&&!pd&&pv!==undefined){pCell=`<span class="cv prev">${pv}</span>`;}
+    else pCell=`<span class="cv emp">—</span>`;
+    if(bd){const b=bc_>1?`<span class="kb">${bc_}×</span>`:'';var bCell=`<span class="cv scrd${osc[cat.id]===0?' zero':''}">${osc[cat.id]===0?'✕':osc[cat.id]}${b}</span>`;}
+    else var bCell=`<span class="cv emp">—</span>`;
+    const fx=cat.fixed?`<span class="cfx">(${cat.fixed})</span>`:'';
+    return`<div class="${cls}" ${oc}><span class="cn">${cat.label}${fx}</span>${pCell}${bCell}</div>`;
+  }
+
+  const up=upSum(msc),bup=upSum(osc),myT=totPts(msc),oppT=totPts(osc);
+  const myN=me()?.name||'Du',oppN=G.players.find((_,i)=>i!==G.myIdx)?.name||'Bot';
+  return`<div class="card">
+    <div class="shdr"><span class="shdr-t">Wertungsblock</span><span class="shdr-n">${myN} / ${oppN}</span></div>
+    <div class="slbl">Oberer Bereich</div>
+    ${CATS.filter(c=>c.upper).map(row).join('')}
+    <div class="bonrow"><span style="flex:1">Bonus ≥73 → +45</span><span style="min-width:44px;text-align:right">${up>=73?'✓ +45':'−'+(73-up)}</span><span style="min-width:44px;text-align:right">${bup>=73?'✓ +45':'—'}</span></div>
+    <div class="slbl" style="margin-top:4px;">Unterer Bereich</div>
+    ${CATS.filter(c=>!c.upper).map(row).join('')}
+    <div class="totrow"><span class="cn" style="flex:1">Gesamt</span><span class="cv">${myT}</span><span class="cv">${oppT}</span></div>
+  </div>
+  <div class="card" style="font-size:11px;color:var(--mu);line-height:1.9;">
+    <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:8px;">Kurzregeln</div>
+    <b style="color:var(--text)">W10 (rot, 0–9)</b> — immer dabei, 0 zählt mit<br>
+    <b style="color:var(--text)">Mehrfach-Kniffel</b> — 2×=100, 3×=150… + Pflicht-Streichen<br>
+    <b style="color:var(--text)">Drei Paare</b> 35 · <b style="color:var(--text)">Zwei Dreier</b> 45 · <b style="color:var(--text)">Gr. Full House</b> 45<br>
+    <b style="color:var(--text)">Highway</b> 50 · <b style="color:var(--text)">Kniffel Extreme★</b> 75<br>
+    <b style="color:var(--text)">Chips</b> — 3 pro Partie → extra Wurf
+  </div>`;
+}
+
+// Roll animation
+let rollTimer=null;
+function animateRoll(keptSnap,callback){
+  G.rolling=true;render();
+  if(gameMode==='multi')ablyPub('rolling',{dice:G.dice,kept:keptSnap,playerIdx:G.myIdx});
+  let f=0;
+  rollTimer=setInterval(()=>{
+    f++;
+    G.dice.w.forEach((v,i)=>{
+      if(!keptSnap.w[i]){const el=document.getElementById('dw'+i);if(el){const rv=r6();el.querySelector('.face').textContent=rv>=1&&rv<=6?FACES[rv]:String(rv);}}
+    });
+    if(!keptSnap.r){const el=document.getElementById('dr');if(el)el.querySelector('.face').textContent=String(r10());}
+    if(f>=14){clearInterval(rollTimer);rollTimer=null;G.rolling=false;if(gameMode==='multi')ablyPub('rolled',{dice:G.dice});callback();}
+  },35);
+}
+
+function tw(i){if(G.phase!=='rolling'||!myTurn())return;G.kept.w[i]=!G.kept.w[i];render();}
+function tr_(){if(G.phase!=='rolling'||!myTurn())return;G.kept.r=!G.kept.r;render();}
+function toggleStrike(){G.strikeMode=!G.strikeMode;G.confirmRestart=false;render();}
+function askRestart(){G.confirmRestart=true;render();}
+function cancelRestart(){G.confirmRestart=false;render();}
+function goLobby(){if(ably){ably.close();ably=null;channel=null;}document.getElementById('waitCard').style.display='none';switchScreen('L');}
+
+function doRoll(){
+  if(!G.rolls||!myTurn()||G.rolling)return;
+  G.confirmRestart=false;
+  if(G.phase==='idle'){
+    G.kept=nk();
+    animateRoll(nk(),()=>{G.dice=nd();G.rolls=2;G.phase='rolling';G.msg=`${G.rolls} Würfe übrig — antippen zum Halten.`;render();});
+  } else if(G.phase==='rolling'){
+    const snap={w:[...G.kept.w],r:G.kept.r};
+    animateRoll(snap,()=>{G.dice={w:G.dice.w.map((v,i)=>snap.w[i]?v:r6()),r:snap.r?G.dice.r:r10()};G.rolls--;if(G.rolls===0){G.phase='score';G.msg='Kein Wurf mehr — Feld auswählen!';}else G.msg=`${G.rolls} Wurf übrig.`;render();});
+  }
+}
+function forceScore(){G.phase='score';G.rolls=0;G.msg='Feld antippen.';render();}
+function useChip(){if(!G.chips||G.phase!=='score'||!myTurn())return;G.chips--;G.rolls=1;G.phase='rolling';G.strikeMode=false;G.msg=`Chip! (${G.chips} übrig)`;render();}
+
+function act(id,strike){
+  if(G.scores[G.myIdx][id]!==undefined||!myTurn())return;
+  const val=strike?0:calcSc(id,G.dice);
+  G.scores[G.myIdx][id]=val;G.strikeMode=false;G.confirmRestart=false;
+  if((id==='lknf'||id==='lke')&&val>0)G.counts[G.myIdx][id]=1;
+  if(gameMode==='multi')ablyPub('move',{type:'score',id,val,count:G.counts[G.myIdx][id]||0});
+  advance();
+}
+function actKnf(id){
+  if(G.scores[G.myIdx][id]===undefined||!myTurn()||calcSc(id,G.dice)===0)return;
+  const base=CATS.find(c=>c.id===id).fixed,nc=(G.counts[G.myIdx][id]||1)+1;
+  G.counts[G.myIdx][id]=nc;G.scores[G.myIdx][id]=base*nc;
+  G.confirmRestart=false;G.strikeMode=true;
+  G.msg=`${nc}× ${CATS.find(c=>c.id===id).label} = ${G.scores[G.myIdx][id]} Pkt! Jetzt streichen.`;
+  if(gameMode==='multi')ablyPub('move',{type:'score',id,val:G.scores[G.myIdx][id],count:nc});
+  render();
+}
+function applyRemoteMove(d){
+  if(d.type!=='score')return;
+  const pIdx=G.players.findIndex(p=>p.id===d.from);if(pIdx<0||pIdx===G.myIdx)return;
+  G.scores[pIdx][d.id]=d.val;if(d.count>0)G.counts[pIdx][d.id]=d.count;
+  if(G.curP===pIdx){if(!checkDone()){G.curP=(G.curP+1)%G.players.length;G.phase='idle';G.rolls=3;G.dice=nd();G.kept=nk();G.oppRolling=null;G.msg=G.curP===G.myIdx?'Dein Zug!':G.players[G.curP].name+' ist dran…';if(G.curP===G.myIdx)showToast(G.players[pIdx].name+' hat gespielt!');}}
+  render();
+}
+function advance(){
+  if(checkDone())return;
+  G.curP=(G.curP+1)%G.players.length;G.phase='idle';G.rolls=3;G.dice=nd();G.kept=nk();G.oppRolling=null;
+  if(G.players[G.curP]?.isBot){G.phase='bot';G.msg='Bot ist dran…';render();setTimeout(botTurn,700);}
+  else{G.msg=G.curP===G.myIdx?'Dein Zug!':G.players[G.curP].name+' ist dran…';render();}
+}
+function checkDone(){if(G.scores.every(s=>CATS.every(c=>s[c.id]!==undefined))){G.phase='gameover';render();return true;}return false;}
+function botTurn(){
+  const bi=G.players.findIndex(p=>p.isBot);if(bi<0)return;const bsc=G.scores[bi];
+  let d=nd();let dec=botPick(d,bsc,2);if(dec?.keep)d={w:d.w.map((v,i)=>dec.keep.w[i]?v:r6()),r:dec.keep.r?d.r:r10()};
+  dec=botPick(d,bsc,1);if(dec?.keep)d={w:d.w.map((v,i)=>dec.keep.w[i]?v:r6()),r:dec.keep.r?d.r:r10()};
+  dec=botPick(d,bsc,0);let chosen=dec?.cat;
+  const ki=isKE(d)?'lke':isKnf(d)?'lknf':null;
+  if(ki&&bsc[ki]!==undefined){const base=CATS.find(c=>c.id===ki).fixed;const nc=(G.counts[bi][ki]||1)+1;G.counts[bi][ki]=nc;bsc[ki]=base*nc;const s=botScratch(bsc);if(s)bsc[s]=0;G.msg=`Bot: ${nc}× = ${bsc[ki]} Pkt!`;}
+  else{if(!chosen)chosen=botScratch(bsc);if(chosen){bsc[chosen]=calcSc(chosen,d)===0?0:calcSc(chosen,d);if((chosen==='lknf'||chosen==='lke')&&bsc[chosen]>0)G.counts[bi][chosen]=1;G.msg=`Bot: ${bsc[chosen]} → "${CATS.find(c=>c.id===chosen)?.label}".`;}}
+  if(checkDone())return;
+  G.curP=G.myIdx;G.phase='idle';G.rolls=3;G.dice=nd();G.kept=nk();G.msg='Dein Zug!';render();
+}
+
+function switchScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+let toastT;
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2800);}
+document.getElementById('nameIn').value='Spieler'+(Math.floor(Math.random()*99)+1);
+</script>
+</body>
+</html>
